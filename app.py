@@ -3,9 +3,8 @@ import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 
-# Database path
-DB_PATH = 'data/CARE_Database.db'
-
+# Updated database path with new Routes table
+DB_PATH = r'C:\Users\HESSEFREDERICK\PycharmProjects\CARE_Dashboard\data\CARE_Database.db'
 
 # Connect to database
 def connect_db():
@@ -78,7 +77,7 @@ def retrieve_units_data(selected_branch):
     top20_customers = get_top20_customers(selected_branch)
 
     with connect_db() as conn:
-        # Define the query with joins to gather all required data
+        # Define the query with joins to gather all required data, including the Supervisor from Routes table
         query = """
             SELECT 
                 UOS.Branch,
@@ -86,15 +85,18 @@ def retrieve_units_data(selected_branch):
                 UOS.`Building Address` AS Address,
                 UOS.`Building Salesperson` AS Salesperson,
                 UOS.`Out of Service Date` AS `Out of Service Date`,
+                UOS.`Route`,
                 CU.`Contract Number` AS `Contract #`,
                 CU.`Controller Name` AS `Controller Name`,
                 CC.Customer,
                 CC.`Expiration Date` AS `Contract Expiry Date`,
                 CC.`Current Monthly Amount`,
-                CC.`Billing Frequency`
+                CC.`Billing Frequency`,
+                R.Supervisor AS `Supervisor`
             FROM Units_Out_Of_Service AS UOS
             LEFT JOIN Canada_Units AS CU ON UOS.`Serial Number` = CU.`Serial Number`
             LEFT JOIN Canada_Contracts AS CC ON CU.`Contract Number` = CC.`Contract #`
+            LEFT JOIN Routes AS R ON UOS.`Route` = R.`Route`
             WHERE UOS.Branch = ?
         """
         # Fetch data into DataFrame
@@ -140,8 +142,14 @@ def retrieve_units_data(selected_branch):
         # Format Annual Value as currency
         df['Annual Value'] = df['Annual Value'].apply(lambda x: "${:,.2f}".format(x))
 
-        # Drop the "Controller Name", "Out of Service Date", "Current Monthly Amount", and "Billing Frequency" columns from the final display
-        df = df.drop(columns=["Controller Name", "Out of Service Date", "Current Monthly Amount", "Billing Frequency"])
+        # Reorder columns to the specified order
+        df = df[['Branch', 'Address', 'Customer', 'Top 20 Customer', 'Contract Expiry Date', 'Annual Value',
+                 'Contract #', 'Unit ID', 'Salesperson', 'Supervisor', 'TAC Controller', 'Days Out of Service']]
+
+        # Drop unnecessary columns
+        df = df.drop(
+            columns=["Controller Name", "Out of Service Date", "Current Monthly Amount", "Billing Frequency", "Route"],
+            errors='ignore')
 
         # Print out the number of units for verification
         print(f"Number of units retrieved for branch {selected_branch}: {len(df)}")
@@ -173,24 +181,23 @@ if st.sidebar.button("Retrieve Units Data"):
         if not units_data.empty:
             # Convert DataFrame to HTML with custom CSS styling
             html_table = units_data.to_html(index=False, classes='wide-table')
-            # Inject CSS to center align all columns, wrap text in Address column, and widen Expiry Date
+            # Inject CSS to center the table and align columns
             st.markdown(
                 """
                 <style>
                 .wide-table {
-                    width: 100%;
-                    margin-left: auto;
-                    margin-right: auto;
+                    width: 80%; /* Center the table horizontally */
+                    margin: auto;
                 }
                 .wide-table th, .wide-table td {
                     padding: 8px;
                     text-align: center;  /* Center align all columns */
                 }
-                .wide-table td:nth-child(3) { /* Wrap text for Address column */
+                .wide-table td:nth-child(2) { /* Wrap text for Address column */
                     white-space: normal;
                     word-wrap: break-word;
                 }
-                .wide-table td:nth-child(7) { /* Set minimum width for Contract Expiry Date */
+                .wide-table td:nth-child(5) { /* Set minimum width for Contract Expiry Date */
                     min-width: 120px;
                 }
                 </style>
