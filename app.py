@@ -4,7 +4,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 
 # Database path
-DB_PATH = 'data/CARE_Database.db'
+DB_PATH = r'C:\Users\HESSEFREDERICK\PycharmProjects\CARE_Dashboard\data\CARE_Database.db'
 
 
 # Connect to database
@@ -28,8 +28,55 @@ def get_branches(selected_region):
     return branches
 
 
+# Function to calculate top 20 customers for the selected branch
+def get_top20_customers(selected_branch):
+    with connect_db() as conn:
+        # Query for all contracts for the selected branch, along with customer and contract values
+        query = """
+            SELECT 
+                CC.Customer,
+                CC.`Current Monthly Amount`,
+                CC.`Billing Frequency`
+            FROM Canada_Contracts AS CC
+            WHERE CC.Branch = ?
+        """
+        contracts_df = pd.read_sql_query(query, conn, params=(selected_branch,))
+
+    # Define billing frequency multipliers
+    frequency_multipliers = {
+        "Monthly": 12,
+        "Bi-Monthly": 6,
+        "Quarterly": 4,
+        "Semi-Annually": 2,
+        "Annually": 1,
+        "Non-Billable": 0
+    }
+
+    # Convert Current Monthly Amount to numeric and calculate Annual Value for each contract
+    contracts_df['Current Monthly Amount'] = pd.to_numeric(
+        contracts_df['Current Monthly Amount'].replace(r'[\$,]', '', regex=True), errors='coerce').fillna(0)
+    contracts_df['Annual Value'] = contracts_df.apply(
+        lambda x: x['Current Monthly Amount'] * frequency_multipliers.get(x['Billing Frequency'], 0), axis=1)
+
+    # Aggregate the annual value by customer
+    top_customers = contracts_df.groupby('Customer')['Annual Value'].sum().reset_index()
+
+    # Rank customers by aggregated annual value and get the top 20
+    top_customers = top_customers.sort_values(by='Annual Value', ascending=False).head(20)
+
+    # Print top 20 customers and their aggregated values
+    print("Top 20 customers for branch:", selected_branch)
+    print(top_customers)
+
+    # Return a set of the top 20 customers for quick lookup
+    return set(top_customers['Customer'])
+
+
 # Function to retrieve units data for selected branch and region
 def retrieve_units_data(selected_branch):
+    # Identify top 20 customers for the selected branch
+    top20_customers = get_top20_customers(selected_branch)
+
     with connect_db() as conn:
         # Define the query with joins to gather all required data
         query = """
@@ -38,11 +85,13 @@ def retrieve_units_data(selected_branch):
                 UOS.`Serial Number` AS `Unit ID`,
                 UOS.`Building Address` AS Address,
                 UOS.`Building Salesperson` AS Salesperson,
-                UOS.`Out of Service Date` AS `Out of Service Date`,  -- Used for filtering by 60 days
+                UOS.`Out of Service Date` AS `Out of Service Date`,
                 CU.`Contract Number` AS `Contract #`,
-                CU.`Controller Name` AS `Controller Name`,  -- Check for TAC Controller
+                CU.`Controller Name` AS `Controller Name`,
                 CC.Customer,
-                CC.`Expiration Date` AS `Contract Expiry Date`
+                CC.`Expiration Date` AS `Contract Expiry Date`,
+                CC.`Current Monthly Amount`,
+                CC.`Billing Frequency`
             FROM Units_Out_Of_Service AS UOS
             LEFT JOIN Canada_Units AS CU ON UOS.`Serial Number` = CU.`Serial Number`
             LEFT JOIN Canada_Contracts AS CC ON CU.`Contract Number` = CC.`Contract #`
@@ -57,10 +106,13 @@ def retrieve_units_data(selected_branch):
         cutoff_date = comparison_date + timedelta(days=13 * 30)  # approx. 13 months
         df = df[df['Contract Expiry Date'] <= cutoff_date]
 
-        # Parse Out of Service Date and filter out units that have been out of service for 60 days or more
+        # Parse Out of Service Date and calculate days out of service
         df['Out of Service Date'] = pd.to_datetime(df['Out of Service Date'], errors='coerce')
         today = datetime.today()
-        df = df[(today - df['Out of Service Date']).dt.days < 60]
+        df['Days Out of Service'] = (today - df['Out of Service Date']).dt.days
+
+        # Filter out units that have been out of service for 60 days or more
+        df = df[df['Days Out of Service'] < 60]
 
         # Ensure Contract # is an integer
         df['Contract #'] = pd.to_numeric(df['Contract #'], errors='coerce').fillna(0).astype(int)
@@ -68,8 +120,28 @@ def retrieve_units_data(selected_branch):
         # Add TAC Controller column based on "Controller Name" containing "TAC"
         df['TAC Controller'] = df['Controller Name'].apply(lambda x: "✅" if "TAC" in str(x) else "")
 
-        # Drop the "Controller Name" and "Out of Service Date" columns from the final display
-        df = df.drop(columns=["Controller Name", "Out of Service Date"])
+        # Calculate Annual Value based on Current Monthly Amount and Billing Frequency
+        frequency_multipliers = {
+            "Monthly": 12,
+            "Bi-Monthly": 6,
+            "Quarterly": 4,
+            "Semi-Annually": 2,
+            "Annually": 1,
+            "Non-Billable": 0
+        }
+        df['Current Monthly Amount'] = pd.to_numeric(df['Current Monthly Amount'].replace(r'[\$,]', '', regex=True),
+                                                     errors='coerce').fillna(0)
+        df['Annual Value'] = df.apply(
+            lambda x: x['Current Monthly Amount'] * frequency_multipliers.get(x['Billing Frequency'], 0), axis=1)
+
+        # Add Top 20 Customer column based on top 20 customer list
+        df['Top 20 Customer'] = df['Customer'].apply(lambda x: "✅" if x in top20_customers else "")
+
+        # Format Annual Value as currency
+        df['Annual Value'] = df['Annual Value'].apply(lambda x: "${:,.2f}".format(x))
+
+        # Drop the "Controller Name", "Out of Service Date", "Current Monthly Amount", and "Billing Frequency" columns from the final display
+        df = df.drop(columns=["Controller Name", "Out of Service Date", "Current Monthly Amount", "Billing Frequency"])
 
         # Print out the number of units for verification
         print(f"Number of units retrieved for branch {selected_branch}: {len(df)}")
