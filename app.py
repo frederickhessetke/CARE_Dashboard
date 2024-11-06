@@ -4,7 +4,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 
 # Database path
-DB_PATH = r'C:\Users\HESSEFREDERICK\PycharmProjects\CARE_Dashboard\data\CARE_Database.db'
+DB_PATH = 'data/CARE_Database.db'
 
 
 # Connect to database
