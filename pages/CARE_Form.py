@@ -142,7 +142,7 @@ def main():
             st.success("Form has been approved and submitted by the RVP.")
         else:
             # Generate the email content for manual copy-paste
-            form_link = f"http://localhost:8501/CARE_Form?unit_id={unit_id}&rvp_approval=True"
+            form_link = f"https://canada-care-dashboard-test.streamlit.app/CARE_Form?unit_id={unit_id}&rvp_approval=True"
             email_subject = "CARE Submission Form Approval Required"
             email_body = (
                 f"Dear RVP,\n\n"
