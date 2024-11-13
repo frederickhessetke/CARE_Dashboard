@@ -4,8 +4,8 @@ import os
 from datetime import datetime, timedelta
 
 
-# Database path
-DB_PATH = os.path.abspath(r'C:\Users\HESSEFREDERICK\PycharmProjects\CARE_App\data\CARE_Database.db')
+# Using a relative path to access the database file
+DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'CARE_Database.db')
 
 
 def connect_db():
