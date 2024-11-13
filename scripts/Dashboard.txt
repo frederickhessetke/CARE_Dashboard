@@ -1,0 +1,40 @@
+To start working on the app.
+
+The idea is to retrieve information from multiple tables and display it for review.
+
+There needs to be a settings section where the user can select the "Region" and "Branch" to retrieve the data.
+
+It should be just a dropdown menu.
+
+The options can be interpreted from the Canada_Hierarchy table.
+
+The options for the "Region" field are in the Region column on that table, and the Options for "Branch" are in the Branch column. However, only "Parent Branch" are to be displayed as options.
+
+So for instance, "Central Nova" is a branch but their Parent Branch is Halifax, so they would not appear as a branch option, rather they'd be within the
+____________________________________________________________________
+Great!
+
+Now for the second part, building a function that will retrieve data and populate it in a table.
+
+Once the branch and region selection are made, there should be a button underneath that menu that reads "Retrieve Units Data".
+
+The table will have the following columns:
+
+Branch | Unit ID | Address | Salesperson |  Contract # | Customer | Contract Expiry Date 
+
+Once the user clicks that button there should be a list of Units out of Service for the selected branch where the contract expiry date is 18 months or less. 
+
+Here's a breakdown of the data, its intended types (meaning if they differ from that type, make sure to convert it accordingly) and where to retrieve the data on the database:
+
+Branch: This data type is text. Available on the Units_Out_Of_Service table (Column "Branch")
+Unit ID: This data type is text. Available on the Units_Out_Of_Service (Column "Serial Number" and Canada_Units (Column "Serial Number") tables 
+Address: This data type is text. Available on the Units_Out_Of_Service table (Column "Building Address")
+Salesperson: This data type is text. Available on the Units_Out_Of_Service (Column: "Building Salesperson") and Canada_Units table (Column "Building Sales Rep")
+Contract #: This data type is text. Available on the Canada_Units (Column "Contract Number") and Canada_Contracts (Column "Contract #") tables
+Customer: This data type is text. Available on the Canada_Contracts table (Column "Customer")
+Contract Expiry Date: This data type is date. Available on the Canada_Contracts table (Column "Expiration Date")
+
+In terms of table relationships you can use this information:
+
+Units_Out_Of_Service has the Unit ID, which can be used as key to access data from Canada_Units.
+Canada_Units has Contract #, which can be used as a key to access data from Canada_Contracts.
