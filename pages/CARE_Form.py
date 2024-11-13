@@ -1,52 +1,45 @@
 import streamlit as st
-from scripts.db_utils import retrieve_pending_submission, get_branch_code, save_to_care_submissions, update_unit_status
+from scripts.db_utils import retrieve_units_data, get_branch_code, save_to_care_submissions, update_unit_status
 import urllib.parse
 
 def main():
-    # Capture URL parameters if available
-    query_params = st.experimental_get_query_params()
+    # Ensure 'unit_id_for_review' and 'is_rvp_approval' are set in session state
+    query_params = st.query_params
     unit_id_from_url = query_params.get("unit_id", [None])[0]
     rvp_approval_from_url = query_params.get("rvp_approval", ["False"])[0] == "True"
 
-    # Set session state values if they aren't already defined
+    # Store URL parameters in session state only if they don't already exist
     if unit_id_from_url and "unit_id_for_review" not in st.session_state:
         st.session_state["unit_id_for_review"] = unit_id_from_url
     if "is_rvp_approval" not in st.session_state:
         st.session_state["is_rvp_approval"] = rvp_approval_from_url
 
-    # Require the user's email for access
+    # Ensure email is provided before proceeding
     if "user_email" not in st.session_state:
-        st.warning("To gain access to the app, please enter your email.")
+        st.warning("To gain access to the app, you need to first provide your email.")
         st.stop()
 
-    # Retrieve unit ID and approval status from session state
+    # Retrieve values from session state
     unit_id = st.session_state.get("unit_id_for_review")
     is_rvp_approval = st.session_state.get("is_rvp_approval", False)
 
-    # Verify the unit ID is present for review
+    # Verify that we have a unit_id to review
     if not unit_id:
         st.error("No Unit ID found for review. Please ensure you're accessing the correct link.")
         st.stop()
 
-    # Fetch pending submission data from CARE_Pending_Submissions table
-    unit_data = retrieve_pending_submission(unit_id)
-    
-    # Debugging output to confirm structure and columns
-    st.write("**Debugging: Columns in unit_data:**", unit_data.columns.tolist())
-    st.write("**Debugging: First few rows of unit_data:**")
-    st.write(unit_data.head())
-
-    # Check if 'Branch' is available and handle if not
-    if 'Branch' not in unit_data.columns:
-        st.error("The 'Branch' column is missing from the retrieved data. Please ensure the database includes this column.")
+    # Retrieve unit data based on the unit_id
+    unit_data = retrieve_units_data(selected_branch=None, unit_id=unit_id)
+    if unit_data.empty:
+        st.error("No details found for the selected Unit ID.")
         st.stop()
 
-    # Extract relevant details for the form fields
+    # Extract relevant details from the retrieved unit data
     unit_details = unit_data.iloc[0]
-    branch = unit_details.get('Branch', 'N/A')
-    customer = unit_details.get('Customer', 'N/A')
-    contract_expiry_date = unit_details.get('Contract Expiry Date', 'N/A')
-    controller_manufacturer = unit_details.get('Controller Name', 'N/A')
+    branch = unit_details['Branch']
+    customer = unit_details['Customer']
+    contract_expiry_date = unit_details['Contract Expiry Date']
+    controller_manufacturer = unit_details['Controller Name']
     branch_code = get_branch_code(branch) or "N/A"
 
     st.title("CARE Submission Form")
@@ -149,7 +142,7 @@ def main():
             st.success("Form has been approved and submitted by the RVP.")
         else:
             # Generate the email content for manual copy-paste
-            form_link = f"https://canada-care-dashboard-test.streamlit.app/CARE_Form?unit_id={unit_id}&rvp_approval=True"
+            form_link = f"http://localhost:8501/CARE_Form?unit_id={unit_id}&rvp_approval=True"
             email_subject = "CARE Submission Form Approval Required"
             email_body = (
                 f"Dear RVP,\n\n"
