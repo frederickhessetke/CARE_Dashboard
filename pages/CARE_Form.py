@@ -4,7 +4,7 @@ import urllib.parse
 
 def main():
     # Capture URL parameters if available
-    query_params = st.query_params
+    query_params = st.experimental_get_query_params()
     unit_id_from_url = query_params.get("unit_id", [None])[0]
     rvp_approval_from_url = query_params.get("rvp_approval", ["False"])[0] == "True"
 
@@ -30,16 +30,23 @@ def main():
 
     # Fetch pending submission data from CARE_Pending_Submissions table
     unit_data = retrieve_pending_submission(unit_id)
-    if unit_data.empty:
-        st.error("No details found for the selected Unit ID.")
+    
+    # Debugging output to confirm structure and columns
+    st.write("**Debugging: Columns in unit_data:**", unit_data.columns.tolist())
+    st.write("**Debugging: First few rows of unit_data:**")
+    st.write(unit_data.head())
+
+    # Check if 'Branch' is available and handle if not
+    if 'Branch' not in unit_data.columns:
+        st.error("The 'Branch' column is missing from the retrieved data. Please ensure the database includes this column.")
         st.stop()
 
     # Extract relevant details for the form fields
     unit_details = unit_data.iloc[0]
-    branch = unit_details['Branch']
-    customer = unit_details['Customer']
-    contract_expiry_date = unit_details['Contract Expiry Date']
-    controller_manufacturer = unit_details['Controller Name']
+    branch = unit_details.get('Branch', 'N/A')
+    customer = unit_details.get('Customer', 'N/A')
+    contract_expiry_date = unit_details.get('Contract Expiry Date', 'N/A')
+    controller_manufacturer = unit_details.get('Controller Name', 'N/A')
     branch_code = get_branch_code(branch) or "N/A"
 
     st.title("CARE Submission Form")
