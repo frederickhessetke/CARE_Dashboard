@@ -4,8 +4,8 @@ import os
 from datetime import datetime, timedelta
 
 
-# Adjust path to move up one directory and then access the database file
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'CARE_Database.db')
+# Database path
+DB_PATH = os.path.abspath(r'C:\Users\HESSEFREDERICK\PycharmProjects\CARE_App\data\CARE_Database.db')
 
 
 def connect_db():
@@ -220,9 +220,70 @@ def create_pending_submissions_table():
 def save_to_pending_submissions(form_data):
     create_pending_submissions_table()
 
-    # Add "status" field directly to form_data
-    form_data["status"] = "Pending"  # or "Approved" as needed
+    # Ensure "status" field is included with a default value
+    form_data["status"] = "Pending"
 
+    # Connect to the database and fetch column names from CARE_Pending_Submissions
+    try:
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        # Get the column names from the table
+        cursor.execute("PRAGMA table_info(CARE_Pending_Submissions)")
+        table_columns = [column[1] for column in cursor.fetchall()]
+
+    except sqlite3.Error as e:
+        print(f"Error retrieving table columns: {e}")
+        conn.close()
+        return
+
+    # Debugging: Check each field for valid value and corresponding column
+    print("Debugging form_data contents with status indicators:")
+    for key, value in form_data.items():
+        # Check if the field has a corresponding column in the table
+        has_column = key in table_columns
+        has_value = bool(value)
+
+        # Display ✔ if both value and column are valid, ✘ if either is missing
+        status_icon = "✔" if has_column and has_value else "✘"
+        status_message = f"{key}: {status_icon} (Value: {'Valid' if has_value else 'Missing'}, Column: {'Exists' if has_column else 'Missing'})"
+        print(status_message)
+
+    # Prepare values for insertion
+    values = (
+        form_data["unit_id"],
+        form_data["region"],
+        form_data["area"],
+        form_data["branch_code"],
+        form_data["wo_number"],
+        form_data["customer"],
+        form_data["wo_type"],
+        form_data["description"],
+        form_data["order_date"],
+        form_data["estimated_completion"],
+        form_data["pre_calc_labour_hours"],
+        form_data["branch_name"],
+        form_data["unit_on_list"],
+        form_data["contract_expiry_date"],
+        form_data["temperament"],
+        form_data["poc_name"],
+        form_data["customer_email"],
+        form_data["controller_manufacturer"],
+        form_data["max_connected"],
+        form_data["tk_extend_status"],
+        form_data["number_of_stops"],
+        form_data["customer_visit_date"],
+        form_data["dm_approval_date"],
+        form_data["approval_by_dm"],
+        form_data["dm_notes"],
+        form_data["repair_team_hours"],
+        form_data["repair_labour_hours"],
+        form_data["notes"],
+        form_data["value_approved"],
+        form_data["status"]
+    )
+
+    # Insert data into the database
     insert_data_query = """
     INSERT OR REPLACE INTO CARE_Pending_Submissions (
         unit_id, region, area, branch_code, wo_number, customer, wo_type, description,
@@ -235,40 +296,7 @@ def save_to_pending_submissions(form_data):
     """
 
     try:
-        conn = connect_db()
-        cursor = conn.cursor()
-        cursor.execute(insert_data_query, (
-            form_data["unit_id"],
-            form_data["region"],
-            form_data["area"],
-            form_data["branch_code"],
-            form_data["wo_number"],
-            form_data["customer"],
-            form_data["wo_type"],
-            form_data["description"],
-            form_data["order_date"],
-            form_data["estimated_completion"],
-            form_data["pre_calc_labour_hours"],
-            form_data["branch_name"],
-            form_data["unit_on_list"],
-            form_data["contract_expiry_date"],
-            form_data["temperament"],
-            form_data["poc_name"],
-            form_data["customer_email"],
-            form_data["controller_manufacturer"],
-            form_data["max_connected"],
-            form_data["tk_extend_status"],
-            form_data["number_of_stops"],
-            form_data["customer_visit_date"],
-            form_data["dm_approval_date"],
-            form_data["approval_by_dm"],
-            form_data["dm_notes"],
-            form_data["repair_team_hours"],
-            form_data["repair_labour_hours"],
-            form_data["notes"],
-            form_data["value_approved"],
-            form_data["status"]  # New field included in form_data
-        ))
+        cursor.execute(insert_data_query, values)
         conn.commit()
     except sqlite3.Error as e:
         print(f"Error saving data to CARE_Pending_Submissions: {e}")
